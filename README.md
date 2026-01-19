@@ -1,0 +1,73 @@
+# Bravida Cloud RPA (UI-automatisering)
+
+Produksjonsklart UI-automatiseringsverktøy for å force punktverdier i Bravida Cloud via nettleser (Playwright).
+
+## Krav
+- Windows (lokal drift-PC)
+- Python 3.11+
+- Playwright (sync API)
+
+## Installasjon
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+playwright install
+```
+
+## Førstegangs login (manuell)
+
+Åpner nettleseren headful, lar deg logge inn via SSO/MFA, og lagrer session state.
+
+```bash
+python -m src.main login
+```
+
+Storage state lagres i `state/bravida_storage_state.json`.
+
+## Force enkel verdi
+
+```bash
+python -m src.main force --point 360.005-JV40_Pos --value 30
+python -m src.main force --point 360.005-JV50_Pos --value 35
+```
+
+## Batch-modus
+
+Eksempel `config.json`:
+
+```json
+{
+  "operations": [
+    {"point": "360.005-JV40_Pos", "value": 30},
+    {"point": "360.005-JV50_Pos", "value": 35}
+  ]
+}
+```
+
+Kjør batch:
+
+```bash
+python -m src.main batch --config config.json
+```
+
+## Dry-run (sikkerhetsmodus)
+
+Kjører hele flyten frem til rett før OK (ingen endring blir bekreftet).
+
+```bash
+python -m src.main force --point 360.005-JV40_Pos --value 30 --dry-run
+python -m src.main batch --config config.json --dry-run
+```
+
+## Logger og screenshots
+
+- Logg (JSONL): `logs/bravida_actions.jsonl`
+- Generell logg: `logs/bravida_rpa.log`
+- Feil-screenshots: `artifacts/`
+
+## Tips
+- Standard URL kan overstyres med `--url`.
+- Storage state kan overstyres med `--storage-state`.
+- Default er headful. Bruk `--headless` ved behov.

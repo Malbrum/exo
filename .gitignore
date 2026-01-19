@@ -205,3 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Bravida RPA artifacts/state
+state/
+logs/
+artifacts/
