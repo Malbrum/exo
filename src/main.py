@@ -47,6 +47,13 @@ def parse_args() -> argparse.Namespace:
         "--dry-run", action="store_true", help="Simuler uten å klikke OK"
     )
 
+    unforce_parser = subparsers.add_parser("unforce", help="Slipp force pa et punkt")
+    unforce_parser.add_argument("--point", required=True, help="Punktnavn")
+
+    read_parser = subparsers.add_parser("read", help="Les gjeldende verdi")
+    read_parser.add_argument("--point", required=True, help="Punktnavn")
+
+
     batch_parser = subparsers.add_parser("batch", help="Kjør batch med flere punkt")
     batch_parser.add_argument("--config", required=True, help="Path til JSON config")
     batch_parser.add_argument(
@@ -87,7 +94,7 @@ def main() -> int:
     storage_state_path = Path(args.storage_state)
     artifacts_dir = Path("artifacts")
 
-    if args.command in {"force", "batch"} and not storage_state_path.exists():
+    if args.command in {"force", "unforce", "read", "batch"} and not storage_state_path.exists():
         logger.error("Mangler storage state. Kjør 'login' først.")
         return 1
 
@@ -112,6 +119,8 @@ def main() -> int:
                 "message": result.message,
                 "screenshot": result.screenshot_path,
                 "dry_run": args.dry_run,
+                "updated_value": result.updated_value,
+                "action": "force",
             }
             log_action(log_path, payload)
             if result.success:
@@ -120,20 +129,70 @@ def main() -> int:
             logger.error("Force feilet: %s", result.message)
             return 1
 
+        if args.command == "unforce":
+            result = client.unforce_point(args.point)
+            payload = {
+                "point": result.point,
+                "value": result.value,
+                "success": result.success,
+                "message": result.message,
+                "screenshot": result.screenshot_path,
+                "updated_value": result.updated_value,
+                "action": "unforce",
+            }
+            log_action(log_path, payload)
+            if result.success:
+                logger.info("Unforce OK: %s", result.point)
+                return 0
+            logger.error("Unforce feilet: %s", result.message)
+            return 1
+
+        if args.command == "read":
+            result = client.read_point(args.point)
+            payload = {
+                "point": result.point,
+                "value": result.value,
+                "success": result.success,
+                "message": result.message,
+                "screenshot": result.screenshot_path,
+                "updated_value": result.updated_value,
+                "action": "read",
+            }
+            log_action(log_path, payload)
+            if result.success:
+                logger.info("Read OK: %s=%s", result.point, result.updated_value)
+                return 0
+            logger.error("Read feilet: %s", result.message)
+            return 1
+
         if args.command == "batch":
             operations = load_batch_config(Path(args.config))
             exit_code = 0
             for op in operations:
+                action = str(op.get("action", "force")).lower()
                 point = op.get("point")
                 value = op.get("value")
-                if not point or value is None:
+                if not point:
+                    logger.error("Ugyldig operasjon i config: %s", op)
+                    exit_code = 1
+                    continue
+                if action not in {"force", "unforce", "read"}:
+                    logger.error("Ugyldig action i config: %s", op)
+                    exit_code = 1
+                    continue
+                if action == "force" and value is None:
                     logger.error("Ugyldig operasjon i config: %s", op)
                     exit_code = 1
                     continue
                 for attempt in range(1, args.retries + 1):
-                    result = client.force_point(
-                        str(point), str(value), dry_run=args.dry_run
-                    )
+                    if action == "force":
+                        result = client.force_point(
+                            str(point), str(value), dry_run=args.dry_run
+                        )
+                    elif action == "unforce":
+                        result = client.unforce_point(str(point))
+                    else:
+                        result = client.read_point(str(point))
                     payload = {
                         "point": result.point,
                         "value": result.value,
@@ -142,18 +201,22 @@ def main() -> int:
                         "screenshot": result.screenshot_path,
                         "dry_run": args.dry_run,
                         "attempt": attempt,
+                        "updated_value": result.updated_value,
+                        "action": action,
                     }
                     log_action(log_path, payload)
                     if result.success:
                         logger.info(
-                            "Force OK: %s=%s (forsøk %s)",
+                            "%s OK: %s=%s (fors?k %s)",
+                            action.capitalize(),
                             result.point,
-                            result.value,
+                            result.updated_value if action == "read" else result.value,
                             attempt,
                         )
                         break
                     logger.error(
-                        "Force feilet for %s (forsøk %s): %s",
+                        "%s feilet for %s (fors?k %s): %s",
+                        action.capitalize(),
                         result.point,
                         attempt,
                         result.message,

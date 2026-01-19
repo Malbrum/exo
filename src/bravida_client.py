@@ -18,8 +18,10 @@ from .selectors import (
     CANCEL_BUTTON_TEXT,
     DIALOG_ROLE,
     FORCE_BUTTON_TEXT,
+    FORCE_TOGGLE_SELECTOR,
     INPUT_SELECTORS,
     OK_BUTTON_TEXT,
+    UNFORCE_BUTTON_TEXT,
 )
 
 
@@ -30,6 +32,7 @@ class ForceResult:
     success: bool
     message: str
     screenshot_path: Optional[str] = None
+    updated_value: Optional[str] = None
 
 
 class BravidaClient:
@@ -90,7 +93,7 @@ class BravidaClient:
             dialog = self.open_point_dialog(point_name)
             self._guard_dialog_point(dialog, point_name)
 
-            force_button = dialog.get_by_role("button", name=FORCE_BUTTON_TEXT)
+            force_button = self._get_force_button(dialog)
             force_button.click()
 
             value_input = self._wait_for_force_input(dialog)
@@ -109,18 +112,84 @@ class BravidaClient:
                 )
 
             ok_button.click()
+            updated_value = self._read_value(dialog)
             dialog.wait_for(state="detached", timeout=self.timeout_ms)
             return ForceResult(
                 point=point_name,
                 value=str(value),
                 success=True,
                 message="Force gjennomført.",
+                updated_value=updated_value,
             )
         except (PlaywrightTimeoutError, PlaywrightError, RuntimeError) as exc:
             screenshot = self._capture_failure(point_name)
             return ForceResult(
                 point=point_name,
                 value=str(value),
+                success=False,
+                message=str(exc),
+                screenshot_path=screenshot,
+            )
+
+    def unforce_point(self, point_name: str) -> ForceResult:
+        if not self.page:
+            raise RuntimeError("Playwright page not initialized.")
+        try:
+            self.page.goto(self.base_url, wait_until="networkidle")
+            dialog = self.open_point_dialog(point_name)
+            self._guard_dialog_point(dialog, point_name)
+
+            unforce_button = dialog.get_by_text(UNFORCE_BUTTON_TEXT).first
+            unforce_button.click()
+
+            ok_button = dialog.get_by_role("button", name=OK_BUTTON_TEXT)
+            if not ok_button.is_enabled():
+                raise RuntimeError("OK-knappen er deaktivert, avbryter.")
+
+            ok_button.click()
+            updated_value = self._read_value(dialog)
+            dialog.wait_for(state="detached", timeout=self.timeout_ms)
+            return ForceResult(
+                point=point_name,
+                value="",
+                success=True,
+                message="Force sluppet.",
+                updated_value=updated_value,
+            )
+        except (PlaywrightTimeoutError, PlaywrightError, RuntimeError) as exc:
+            screenshot = self._capture_failure(point_name)
+            return ForceResult(
+                point=point_name,
+                value="",
+                success=False,
+                message=str(exc),
+                screenshot_path=screenshot,
+            )
+
+    def read_point(self, point_name: str) -> ForceResult:
+        if not self.page:
+            raise RuntimeError("Playwright page not initialized.")
+        try:
+            self.page.goto(self.base_url, wait_until="networkidle")
+            dialog = self.open_point_dialog(point_name)
+            self._guard_dialog_point(dialog, point_name)
+
+            updated_value = self._read_value(dialog)
+            cancel_button = dialog.get_by_role("button", name=CANCEL_BUTTON_TEXT)
+            cancel_button.click()
+            dialog.wait_for(state="detached", timeout=self.timeout_ms)
+            return ForceResult(
+                point=point_name,
+                value="",
+                success=True,
+                message="Verdi lest.",
+                updated_value=updated_value,
+            )
+        except (PlaywrightTimeoutError, PlaywrightError, RuntimeError) as exc:
+            screenshot = self._capture_failure(point_name)
+            return ForceResult(
+                point=point_name,
+                value="",
                 success=False,
                 message=str(exc),
                 screenshot_path=screenshot,
@@ -167,6 +236,16 @@ class BravidaClient:
             except PlaywrightTimeoutError:
                 continue
         raise RuntimeError("Fant ikke inputfelt for force-verdi.")
+
+    def _read_value(self, dialog) -> str:
+        value_input = self._wait_for_force_input(dialog)
+        return value_input.input_value()
+
+    def _get_force_button(self, dialog):
+        selector_button = dialog.locator(FORCE_TOGGLE_SELECTOR).first
+        if selector_button.count() > 0:
+            return selector_button
+        return dialog.get_by_role("button", name=FORCE_BUTTON_TEXT)
 
     def _capture_failure(self, point_name: str) -> Optional[str]:
         if not self.page:

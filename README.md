@@ -33,6 +33,13 @@ python -m src.main force --point 360.005-JV40_Pos --value 30
 python -m src.main force --point 360.005-JV50_Pos --value 35
 ```
 
+## Unforce og read
+
+```bash
+python -m src.main unforce --point 360.005-JV50_Pos
+python -m src.main read --point 360.005-JV50_Pos
+```
+
 ## Batch-modus
 
 Eksempel `config.json`:
@@ -40,8 +47,9 @@ Eksempel `config.json`:
 ```json
 {
   "operations": [
-    {"point": "360.005-JV40_Pos", "value": 30},
-    {"point": "360.005-JV50_Pos", "value": 35}
+    {"point": "360.005-JV40_Pos", "value": 30, "action": "force"},
+    {"point": "360.005-JV50_Pos", "action": "unforce"},
+    {"point": "360.005-JV60_Pos", "action": "read"}
   ]
 }
 ```
@@ -66,6 +74,7 @@ python -m src.main batch --config config.json --dry-run
 - Logg (JSONL): `logs/bravida_actions.jsonl`
 - Generell logg: `logs/bravida_rpa.log`
 - Feil-screenshots: `artifacts/`
+- JSONL inkluderer `action` og `updated_value` per operasjon.
 
 ## Tips
 - Standard URL kan overstyres med `--url`.
