@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QTextEdit,
     QProgressBar,
+    QComboBox,
 )
 
 from .bravida_client import BravidaClient
@@ -599,8 +600,13 @@ class AIAnalysisWidget(QWidget):
 
     def _on_scan_clicked(self) -> None:
         """Scan all HVAC points."""
-        self.status_label.setText("Scanning all points...")
+        self.status_label.setText("🔄 Scanning all points...")
         self.scan_button.setEnabled(False)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        layout = self.state_display.parent().layout()
+        layout.insertWidget(1, self.progress_bar)
 
         try:
             reader = BulkPointReader(self.client_args)
@@ -612,16 +618,21 @@ class AIAnalysisWidget(QWidget):
 
             self.analyze_button.setEnabled(True)
             self.auto_adjust_button.setEnabled(True)
+            success_count = sum(
+                1 for p in state.points.values() if p.success
+            )
             self.status_label.setText(
-                f"✓ Scan complete: {len(state.points)} points read"
+                f"✓ Scan complete: {success_count}/{len(state.points)} "
+                "points read"
             )
         except Exception as exc:
             msg = f"Error scanning points: {str(exc)}"
-            self.status_label.setText(msg)
+            self.status_label.setText(f"✗ {msg}")
             self.state_display.setText(msg)
             QMessageBox.critical(self, "Scan Error", msg)
         finally:
             self.scan_button.setEnabled(True)
+            self.progress_bar.setVisible(False)
 
     def _on_analyze_clicked(self) -> None:
         """Run AI analysis on current state."""
@@ -632,7 +643,7 @@ class AIAnalysisWidget(QWidget):
             )
             return
 
-        self.status_label.setText("Running AI analysis...")
+        self.status_label.setText("🤖 Running AI analysis...")
         self.analyze_button.setEnabled(False)
 
         try:
@@ -647,12 +658,13 @@ class AIAnalysisWidget(QWidget):
                 self.current_state, analysis, recommendations
             )
 
-            self.status_label.setText(
+            msg = (
                 f"✓ Analysis complete: "
                 f"{len(recommendations)} recommendations"
             )
+            self.status_label.setText(msg)
         except Exception as exc:
-            msg = f"Analysis error: {str(exc)}"
+            msg = f"✗ Analysis error: {str(exc)}"
             self.status_label.setText(msg)
             QMessageBox.critical(self, "Analysis Error", msg)
         finally:
@@ -669,10 +681,10 @@ class AIAnalysisWidget(QWidget):
 
         reply = QMessageBox.question(
             self,
-            "Auto-Adjust",
+            "Auto-Adjust HVAC System",
             (
                 f"Apply {self.recommendations_table.rowCount()} "
-                "recommendations?"
+                "AI recommendations?"
             ),
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No,
@@ -682,12 +694,13 @@ class AIAnalysisWidget(QWidget):
             return
 
         self.status_label.setText(
-            "Applying recommendations..."
+            "⚡ Applying recommendations..."
         )
         self.auto_adjust_button.setEnabled(False)
 
         try:
             applied = 0
+            failed = 0
             for row in range(self.recommendations_table.rowCount()):
                 action = (
                     self.recommendations_table.item(
@@ -705,24 +718,29 @@ class AIAnalysisWidget(QWidget):
                     ).text()
                 )
 
-                with BravidaClient(**self.client_args) as client:
-                    if action == "force":
-                        result = client.force_point(point, value)
-                    else:
-                        result = client.unforce_point(point)
+                try:
+                    with BravidaClient(**self.client_args) as client:
+                        if action == "force":
+                            result = client.force_point(point, value)
+                        else:
+                            result = client.unforce_point(point)
 
-                    if result.success:
-                        applied += 1
+                        if result.success:
+                            applied += 1
+                        else:
+                            failed += 1
+                except Exception as exc:
+                    failed += 1
+                    print(f"Error applying {point}: {exc}")
 
-            msg = (
-                f"✓ Applied {applied} of "
-                f"{self.recommendations_table.rowCount()} "
-                "recommendations"
-            )
+            total = self.recommendations_table.rowCount()
+            msg = f"✓ Applied {applied} of {total} recommendations"
+            if failed > 0:
+                msg += f"\n⚠ {failed} failed"
             self.status_label.setText(msg)
             QMessageBox.information(self, "Complete", msg)
         except Exception as exc:
-            msg = f"Error applying recommendations: {str(exc)}"
+            msg = f"✗ Error applying recommendations: {str(exc)}"
             self.status_label.setText(msg)
             QMessageBox.critical(self, "Error", msg)
         finally:
@@ -807,6 +825,67 @@ class SettingsWidget(QWidget):
         )
         layout.addWidget(self.headless_checkbox)
 
+        # AI Configuration Section
+        ai_box = QGroupBox("🤖 AI Configuration")
+        ai_layout = QVBoxLayout()
+
+        # AI Backend selection
+        backend_layout = QHBoxLayout()
+        backend_layout.addWidget(QLabel("AI Backend:"))
+        self.ai_backend_combo = QComboBox()
+        self.ai_backend_combo.addItems(
+            ["None (Rule-based)", "OpenAI (ChatGPT)",
+             "Anthropic (Claude)"]
+        )
+        current_backend = self.settings.get("ai_backend", "none")
+        if current_backend == "openai":
+            self.ai_backend_combo.setCurrentIndex(1)
+        elif current_backend == "anthropic":
+            self.ai_backend_combo.setCurrentIndex(2)
+        else:
+            self.ai_backend_combo.setCurrentIndex(0)
+        backend_layout.addWidget(self.ai_backend_combo)
+        ai_layout.addLayout(backend_layout)
+
+        # OpenAI API Key
+        openai_layout = QHBoxLayout()
+        openai_layout.addWidget(QLabel("OpenAI API Key:"))
+        self.openai_key_input = QLineEdit()
+        self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.openai_key_input.setText(
+            self.settings.get("openai_api_key", "")
+        )
+        openai_layout.addWidget(self.openai_key_input)
+        ai_layout.addLayout(openai_layout)
+
+        # Anthropic API Key
+        anthropic_layout = QHBoxLayout()
+        anthropic_layout.addWidget(QLabel("Anthropic API Key:"))
+        self.anthropic_key_input = QLineEdit()
+        self.anthropic_key_input.setEchoMode(
+            QLineEdit.EchoMode.Password
+        )
+        self.anthropic_key_input.setText(
+            self.settings.get("anthropic_api_key", "")
+        )
+        anthropic_layout.addWidget(self.anthropic_key_input)
+        ai_layout.addLayout(anthropic_layout)
+
+        # Parallel workers for bulk reading
+        workers_layout = QHBoxLayout()
+        workers_layout.addWidget(QLabel("Parallel Workers:"))
+        self.workers_spinbox = QSpinBox()
+        self.workers_spinbox.setValue(
+            self.settings.get("ai_workers", 5)
+        )
+        self.workers_spinbox.setMinimum(1)
+        self.workers_spinbox.setMaximum(20)
+        workers_layout.addWidget(self.workers_spinbox)
+        ai_layout.addLayout(workers_layout)
+
+        ai_box.setLayout(ai_layout)
+        layout.addWidget(ai_box)
+
         # Info box
         info_box = QGroupBox("Information")
         info_layout = QVBoxLayout()
@@ -815,7 +894,8 @@ class SettingsWidget(QWidget):
         info_text.setText(
             "HVAC Robot Controller GUI\n\n"
             "This tool automates Bravida Cloud point "
-            "control via browser automation.\n\n"
+            "control via browser automation with AI "
+            "optimization.\n\n"
             "Features:\n"
             "• Force/Unforce individual points\n"
             "• Read current point values\n"
@@ -834,11 +914,22 @@ class SettingsWidget(QWidget):
 
     def get_settings(self) -> dict:
         """Return current settings as a dictionary."""
+        backend_map = {
+            0: "none",
+            1: "openai",
+            2: "anthropic",
+        }
         return {
             "url": self.url_input.text(),
             "storage_state": self.state_input.text(),
             "timeout_ms": self.timeout_spinbox.value(),
             "headless": self.headless_checkbox.isChecked(),
+            "ai_backend": backend_map.get(
+                self.ai_backend_combo.currentIndex(), "none"
+            ),
+            "openai_api_key": self.openai_key_input.text(),
+            "anthropic_api_key": self.anthropic_key_input.text(),
+            "ai_workers": self.workers_spinbox.value(),
         }
 
 
@@ -856,6 +947,10 @@ class HVACRobotGUI(QMainWindow):
             "storage_state": "state/bravida_storage_state.json",
             "timeout_ms": 30000,
             "headless": False,
+            "ai_backend": "none",
+            "openai_api_key": "",
+            "anthropic_api_key": "",
+            "ai_workers": 5,
         }
         self._setup_ui()
         setup_logger()
