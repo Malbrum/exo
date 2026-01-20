@@ -1,0 +1,65 @@
+{
+  "360.005-JV40_Pos": {
+    "name": "Ventilation Damper Position",
+    "unit": "%",
+    "category": "ventilation",
+    "description": "Controls air damper opening for fresh air intake",
+    "min": 0,
+    "max": 100,
+    "optimal": 50
+  },
+  "360.005-JV50_Pos": {
+    "name": "Heating Valve Position",
+    "unit": "%",
+    "category": "heating",
+    "description": "Controls heating water valve opening",
+    "min": 0,
+    "max": 100,
+    "optimal": 30
+  },
+  "360.005-JP40_Pos": {
+    "name": "Cooling Valve Position",
+    "unit": "%",
+    "category": "cooling",
+    "description": "Controls cooling water valve opening",
+    "min": 0,
+    "max": 100,
+    "optimal": 0
+  },
+  "360.005-RT40": {
+    "name": "Room Temperature",
+    "unit": "°C",
+    "category": "temperature",
+    "description": "Current room air temperature",
+    "min": 10,
+    "max": 35,
+    "optimal": 21.5
+  },
+  "360.005-RH40": {
+    "name": "Room Humidity",
+    "unit": "%",
+    "category": "humidity",
+    "description": "Current room relative humidity",
+    "min": 20,
+    "max": 80,
+    "optimal": 45
+  },
+  "360.005-SB40": {
+    "name": "Supply Air Humidity",
+    "unit": "%",
+    "category": "humidity",
+    "description": "Supply air relative humidity",
+    "min": 20,
+    "max": 80,
+    "optimal": 40
+  },
+  "360.005-OD40": {
+    "name": "Outdoor Temperature",
+    "unit": "°C",
+    "category": "external",
+    "description": "Outdoor air temperature",
+    "min": -30,
+    "max": 50,
+    "optimal": null
+  }
+}

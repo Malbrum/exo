@@ -1,2 +1,6 @@
 playwright>=1.40.0
 PyQt6>=6.4.0
+
+# Optional: For AI analysis features
+openai>=1.0.0  # For ChatGPT integration
+anthropic>=0.7.0  # For Claude integration

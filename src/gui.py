@@ -30,6 +30,8 @@ from PyQt6.QtWidgets import (
 )
 
 from .bravida_client import BravidaClient
+from .bulk_reader import BulkPointReader
+from .hvac_ai_analyzer import HVACAIAnalyzer
 from .logging_utils import setup_logger
 
 
@@ -513,6 +515,246 @@ class LogViewerWidget(QWidget):
             self._load_logs()
 
 
+class AIAnalysisWidget(QWidget):
+    """Widget for AI-powered HVAC analysis."""
+
+    def __init__(self, client_args):
+        super().__init__()
+        self.client_args = client_args
+        self.analyzer = HVACAIAnalyzer()
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        layout = QVBoxLayout()
+
+        # Control buttons
+        button_layout = QHBoxLayout()
+        self.scan_button = QPushButton("📊 Scan All Points")
+        self.scan_button.setStyleSheet(
+            "background-color: #2196F3; color: white; padding: 8px;"
+        )
+        self.scan_button.clicked.connect(self._on_scan_clicked)
+        button_layout.addWidget(self.scan_button)
+
+        self.analyze_button = QPushButton("🤖 Analyze & Recommend")
+        self.analyze_button.setStyleSheet(
+            "background-color: #FF9800; color: white; padding: 8px;"
+        )
+        self.analyze_button.clicked.connect(self._on_analyze_clicked)
+        self.analyze_button.setEnabled(False)
+        button_layout.addWidget(self.analyze_button)
+
+        self.auto_adjust_button = QPushButton("⚡ Auto-Adjust")
+        self.auto_adjust_button.setStyleSheet(
+            "background-color: #4CAF50; color: white; padding: 8px;"
+        )
+        self.auto_adjust_button.clicked.connect(self._on_auto_adjust_clicked)
+        self.auto_adjust_button.setEnabled(False)
+        button_layout.addWidget(self.auto_adjust_button)
+
+        layout.addLayout(button_layout)
+
+        # System state display
+        layout.addWidget(QLabel("System State:"))
+        self.state_display = QTextEdit()
+        self.state_display.setReadOnly(True)
+        self.state_display.setStyleSheet(
+            "background-color: #f5f5f5; font-family: monospace;"
+        )
+        layout.addWidget(self.state_display)
+
+        # AI Analysis display
+        layout.addWidget(QLabel("AI Analysis:"))
+        self.analysis_display = QTextEdit()
+        self.analysis_display.setReadOnly(True)
+        self.analysis_display.setStyleSheet(
+            "background-color: #f5f5f5; font-family: monospace;"
+        )
+        layout.addWidget(self.analysis_display)
+
+        # Recommendations table
+        layout.addWidget(QLabel("Recommendations:"))
+        self.recommendations_table = QTableWidget()
+        self.recommendations_table.setColumnCount(6)
+        self.recommendations_table.setHorizontalHeaderLabels(
+            ["Action", "Point", "Value", "Reason",
+             "Confidence", "Priority"]
+        )
+        self.recommendations_table.setColumnWidth(0, 70)
+        self.recommendations_table.setColumnWidth(1, 150)
+        self.recommendations_table.setColumnWidth(2, 80)
+        self.recommendations_table.setColumnWidth(3, 200)
+        self.recommendations_table.setColumnWidth(4, 90)
+        self.recommendations_table.setColumnWidth(5, 70)
+        layout.addWidget(self.recommendations_table)
+
+        # Status
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet(
+            "color: #666; font-style: italic;"
+        )
+        layout.addWidget(self.status_label)
+
+        self.setLayout(layout)
+
+    def _on_scan_clicked(self) -> None:
+        """Scan all HVAC points."""
+        self.status_label.setText("Scanning all points...")
+        self.scan_button.setEnabled(False)
+
+        try:
+            reader = BulkPointReader(self.client_args)
+            state = reader.read_all_points()
+            self.current_state = state
+
+            summary = reader.get_readable_summary(state)
+            self.state_display.setText(summary)
+
+            self.analyze_button.setEnabled(True)
+            self.auto_adjust_button.setEnabled(True)
+            self.status_label.setText(
+                f"✓ Scan complete: {len(state.points)} points read"
+            )
+        except Exception as exc:
+            msg = f"Error scanning points: {str(exc)}"
+            self.status_label.setText(msg)
+            self.state_display.setText(msg)
+            QMessageBox.critical(self, "Scan Error", msg)
+        finally:
+            self.scan_button.setEnabled(True)
+
+    def _on_analyze_clicked(self) -> None:
+        """Run AI analysis on current state."""
+        if not hasattr(self, "current_state"):
+            QMessageBox.warning(
+                self, "No Data",
+                "Please scan points first."
+            )
+            return
+
+        self.status_label.setText("Running AI analysis...")
+        self.analyze_button.setEnabled(False)
+
+        try:
+            analysis, recommendations = (
+                self.analyzer.analyze_system_state(
+                    self.current_state
+                )
+            )
+            self.analysis_display.setText(analysis)
+            self._display_recommendations(recommendations)
+            self.analyzer.save_analysis_history(
+                self.current_state, analysis, recommendations
+            )
+
+            self.status_label.setText(
+                f"✓ Analysis complete: "
+                f"{len(recommendations)} recommendations"
+            )
+        except Exception as exc:
+            msg = f"Analysis error: {str(exc)}"
+            self.status_label.setText(msg)
+            QMessageBox.critical(self, "Analysis Error", msg)
+        finally:
+            self.analyze_button.setEnabled(True)
+
+    def _on_auto_adjust_clicked(self) -> None:
+        """Auto-apply recommendations."""
+        if self.recommendations_table.rowCount() == 0:
+            QMessageBox.warning(
+                self, "No Recommendations",
+                "Run analysis first to get recommendations."
+            )
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Auto-Adjust",
+            (
+                f"Apply {self.recommendations_table.rowCount()} "
+                "recommendations?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self.status_label.setText(
+            "Applying recommendations..."
+        )
+        self.auto_adjust_button.setEnabled(False)
+
+        try:
+            applied = 0
+            for row in range(self.recommendations_table.rowCount()):
+                action = (
+                    self.recommendations_table.item(
+                        row, 0
+                    ).text()
+                )
+                point = (
+                    self.recommendations_table.item(
+                        row, 1
+                    ).text()
+                )
+                value = (
+                    self.recommendations_table.item(
+                        row, 2
+                    ).text()
+                )
+
+                with BravidaClient(**self.client_args) as client:
+                    if action == "force":
+                        result = client.force_point(point, value)
+                    else:
+                        result = client.unforce_point(point)
+
+                    if result.success:
+                        applied += 1
+
+            msg = (
+                f"✓ Applied {applied} of "
+                f"{self.recommendations_table.rowCount()} "
+                "recommendations"
+            )
+            self.status_label.setText(msg)
+            QMessageBox.information(self, "Complete", msg)
+        except Exception as exc:
+            msg = f"Error applying recommendations: {str(exc)}"
+            self.status_label.setText(msg)
+            QMessageBox.critical(self, "Error", msg)
+        finally:
+            self.auto_adjust_button.setEnabled(True)
+
+    def _display_recommendations(self, recommendations):
+        """Display recommendations in table."""
+        self.recommendations_table.setRowCount(0)
+        for i, rec in enumerate(recommendations):
+            self.recommendations_table.insertRow(i)
+            self.recommendations_table.setItem(
+                i, 0, QTableWidgetItem(rec.action)
+            )
+            self.recommendations_table.setItem(
+                i, 1, QTableWidgetItem(rec.point)
+            )
+            self.recommendations_table.setItem(
+                i, 2,
+                QTableWidgetItem(rec.value or "-")
+            )
+            self.recommendations_table.setItem(
+                i, 3, QTableWidgetItem(rec.reason)
+            )
+            self.recommendations_table.setItem(
+                i, 4,
+                QTableWidgetItem(f"{rec.confidence:.1%}")
+            )
+            self.recommendations_table.setItem(
+                i, 5, QTableWidgetItem(str(rec.priority))
+            )
+
+
 class SettingsWidget(QWidget):
     """Widget for application settings."""
 
@@ -673,11 +915,17 @@ class HVACRobotGUI(QMainWindow):
         )
         tabs.addTab(self.batch_widget, "\ud83d\udcd1 Batch Operations")
 
-        # Tab 3: Log Viewer
+        # Tab 3: AI Analysis
+        self.ai_widget = AIAnalysisWidget(
+            self._get_client_args()
+        )
+        tabs.addTab(self.ai_widget, "\ud83e\udd16 AI Analysis")
+
+        # Tab 4: Log Viewer
         self.log_viewer_widget = LogViewerWidget()
         tabs.addTab(self.log_viewer_widget, "\ud83d\udcc8 Logs & Status")
 
-        # Tab 4: Settings
+        # Tab 5: Settings
         self.settings_widget = SettingsWidget(self.settings)
         tabs.addTab(self.settings_widget, "\u2699\ufe0f Settings")
 
