@@ -103,7 +103,7 @@ def parse_args() -> argparse.Namespace:
         help="Overstyr lagringsfil for siste controller-tilstand",
     )
 
-    gui_parser = subparsers.add_parser("gui", help="Kjør grafisk brukergrensesnitt")
+    subparsers.add_parser("gui", help="Kjør grafisk brukergrensesnitt")
 
     return parser.parse_args()
 
@@ -131,8 +131,8 @@ def main() -> int:
 
     if args.command == "gui":
         from .gui import HVACRobotGUI
-        from PyQt6.QtWidgets import QApplication
-        app = QApplication([])
+        from PyQt6.QtWidgets import QApplication as QtApp
+        app = QtApp([])
         window = HVACRobotGUI()
         window.show()
         return app.exec()

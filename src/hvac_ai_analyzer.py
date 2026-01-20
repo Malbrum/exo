@@ -2,11 +2,27 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from .bulk_reader import HVACSystemState
+
+logger = logging.getLogger("hvac_ai_analyzer")
+
+# Optional AI packages
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
+    from anthropic import Anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 
 @dataclass
@@ -35,17 +51,25 @@ class HVACAIAnalyzer:
     def _initialize_client(self) -> None:
         """Initialize LLM client based on backend."""
         if self.ai_backend == "openai":
-            try:
-                from openai import OpenAI
+            if not OPENAI_AVAILABLE:
+                logger.warning("OpenAI package not installed. Install with: pip install openai")
+                self.client = None
+            elif not self.api_key:
+                logger.warning("OpenAI API key not configured. Using rule-based analysis.")
+                self.client = None
+            else:
                 self.client = OpenAI(api_key=self.api_key)
-            except ImportError:
-                print("Warning: openai package not installed")
         elif self.ai_backend == "anthropic":
-            try:
-                from anthropic import Anthropic
+            if not ANTHROPIC_AVAILABLE:
+                logger.warning("Anthropic package not installed. Install with: pip install anthropic")
+                self.client = None
+            elif not self.api_key:
+                logger.warning("Anthropic API key not configured. Using rule-based analysis.")
+                self.client = None
+            else:
                 self.client = Anthropic(api_key=self.api_key)
-            except ImportError:
-                print("Warning: anthropic package not installed")
+        else:
+            self.client = None
 
     def analyze_system_state(
         self, state: HVACSystemState
