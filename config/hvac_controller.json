@@ -1,0 +1,40 @@
+{
+  "sensors": {
+    "indoor_temp": "360.005-RT50",
+    "indoor_rh": "360.005-RF50",
+    "outdoor_temp": "360.005-RT90",
+    "co": "360.005-CO5",
+    "co2": "360.005-CO250"
+  },
+  "thresholds": {
+    "max_rh": 60,
+    "condensation_margin_c": 2,
+    "max_co": 5,
+    "max_co2": 800
+  },
+  "actions": {
+    "on_air_quality": [
+      {"action": "force", "point": "360.005-JV40_Pos", "value": 0},
+      {"action": "force", "point": "360.005-JV50_Pos", "value": 100}
+    ],
+    "on_high_rh": [
+      {"action": "force", "point": "360.005-JV40_Pos", "value": 0},
+      {"action": "force", "point": "360.005-JV50_Pos", "value": 100}
+    ],
+    "on_condensation_risk": [
+      {"action": "force", "point": "360.005-JV40_Pos", "value": 50},
+      {"action": "force", "point": "360.005-JV50_Pos", "value": 20},
+      {"action": "force", "point": "360.005-KA41AB", "value": 100}
+    ],
+    "on_normal": [
+      {"action": "unforce", "point": "360.005-JV40_Pos"},
+      {"action": "unforce", "point": "360.005-JV50_Pos"},
+      {"action": "unforce", "point": "360.005-KA41AB"}
+    ]
+  },
+  "cycle_seconds": 300,
+  "cooldown_seconds": 600,
+  "combine_actions": true,
+  "dry_run": false,
+  "state_path": "state/hvac_controller_state.json"
+}

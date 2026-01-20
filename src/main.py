@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .bravida_client import BravidaClient
+from .hvac_controller import run_controller
 from .logging_utils import DEFAULT_LOG_DIR, DEFAULT_LOG_FILE, log_action, setup_logger
 
 DEFAULT_URL = (
@@ -17,6 +18,7 @@ DEFAULT_URL = (
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Bravida Cloud UI automation")
     parser.add_argument("--url", default=DEFAULT_URL, help="Anleggs-URL i Bravida Cloud")
     parser.add_argument(
@@ -72,10 +74,42 @@ def parse_args() -> argparse.Namespace:
         help="Base backoff i sekunder",
     )
 
+    auto_parser = subparsers.add_parser(
+        "auto", help="Automatisk HVAC-kontroll basert p† sensorverdier"
+    )
+    auto_parser.add_argument("--config", required=True, help="Path til JSON config")
+    auto_parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Kj›r en enkelt evaluering og avslutt",
+    )
+    auto_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Kj›r uten † klikke OK (overstyrer config)",
+    )
+    auto_parser.add_argument(
+        "--cycle-seconds",
+        type=float,
+        help="Overstyr intervall mellom evalueringer",
+    )
+    auto_parser.add_argument(
+        "--cooldown-seconds",
+        type=float,
+        help="Overstyr cooldown mellom modusendringer",
+    )
+    auto_parser.add_argument(
+        "--state-path",
+        help="Overstyr lagringsfil for siste controller-tilstand",
+    )
+
+    gui_parser = subparsers.add_parser("gui", help="Kjør grafisk brukergrensesnitt")
+
     return parser.parse_args()
 
 
 def load_batch_config(path: Path) -> List[Dict[str, Any]]:
+    """Load and parse batch configuration from JSON file."""
     raw = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(raw, dict):
         operations = raw.get("operations", [])
@@ -87,6 +121,7 @@ def load_batch_config(path: Path) -> List[Dict[str, Any]]:
 
 
 def main() -> int:
+    """CLI main function - handle all commands and operations."""
     args = parse_args()
     logger = setup_logger()
     log_path = DEFAULT_LOG_DIR / DEFAULT_LOG_FILE
@@ -94,7 +129,15 @@ def main() -> int:
     storage_state_path = Path(args.storage_state)
     artifacts_dir = Path("artifacts")
 
-    if args.command in {"force", "unforce", "read", "batch"} and not storage_state_path.exists():
+    if args.command == "gui":
+        from .gui import HVACRobotGUI
+        from PyQt6.QtWidgets import QApplication
+        app = QApplication([])
+        window = HVACRobotGUI()
+        window.show()
+        return app.exec()
+
+    if args.command in {"force", "unforce", "read", "batch", "auto"} and not storage_state_path.exists():
         logger.error("Mangler storage state. Kjør 'login' først.")
         return 1
 
@@ -227,6 +270,19 @@ def main() -> int:
                 else:
                     exit_code = 1
             return exit_code
+
+        if args.command == "auto":
+            state_override = Path(args.state_path) if args.state_path else None
+            return run_controller(
+                client,
+                config_path=Path(args.config),
+                log_path=log_path,
+                once=args.once,
+                dry_run_override=args.dry_run if args.dry_run else None,
+                state_path_override=state_override,
+                cycle_seconds_override=args.cycle_seconds,
+                cooldown_seconds_override=args.cooldown_seconds,
+            )
 
     return 0
 

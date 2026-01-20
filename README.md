@@ -60,6 +60,30 @@ Kjør batch:
 python -m src.main batch --config config.json
 ```
 
+## Automatisk HVAC-kontroll
+
+Eksempelkonfigurasjon: `config/hvac_controller.json`
+
+Kj›r kontinuerlig kontroll:
+
+```bash
+python -m src.main auto --config config/hvac_controller.json
+```
+
+Kontrolleren st›tter RH, kondensrisiko og luftkvalitet (CO/CO2) basert p† config.
+
+Kj›r en enkelt evaluering (ingen loop):
+
+```bash
+python -m src.main auto --config config/hvac_controller.json --once
+```
+
+Overstyr intervall, cooldown eller dry-run:
+
+```bash
+python -m src.main auto --config config/hvac_controller.json --cycle-seconds 300 --cooldown-seconds 600 --dry-run
+```
+
 ## Dry-run (sikkerhetsmodus)
 
 Kjører hele flyten frem til rett før OK (ingen endring blir bekreftet).
