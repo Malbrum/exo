@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from .bravida_client import BravidaClient
 
@@ -100,7 +100,7 @@ class BulkPointReader:
 
     def read_all_points(self) -> HVACSystemState:
         """Read all HVAC points in parallel."""
-        from datetime import datetime
+        from datetime import datetime  # pylint: disable=import-outside-toplevel
 
         timestamp = datetime.now().isoformat()
         points = {}
@@ -112,11 +112,12 @@ class BulkPointReader:
             }
 
             for future in as_completed(futures):
-                point_name = futures[future]
                 try:
                     point_data = future.result()
+                    point_name = futures[future]
                     points[point_name] = point_data
-                except Exception as exc:
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    point_name = futures[future]
                     points[point_name] = HVACPoint(
                         name=point_name, success=False, error=str(exc)
                     )
@@ -127,7 +128,7 @@ class BulkPointReader:
 
     def _read_single_point(self, point_name: str) -> HVACPoint:
         """Read a single point from Bravida."""
-        from datetime import datetime
+        from datetime import datetime  # pylint: disable=import-outside-toplevel
 
         try:
             with BravidaClient(**self.client_args) as client:
@@ -145,7 +146,7 @@ class BulkPointReader:
                 error=result.message if not result.success else None,
                 timestamp=datetime.now().isoformat(),
             )
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             return HVACPoint(
                 name=point_name,
                 success=False,

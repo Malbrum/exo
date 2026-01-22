@@ -1,4 +1,5 @@
 """Professional HVAC Robot Controller GUI using PyQt6."""
+# pylint: disable=no-name-in-module,too-many-lines
 from __future__ import annotations
 
 import json
@@ -602,11 +603,12 @@ class AIAnalysisWidget(QWidget):
         """Scan all HVAC points."""
         self.status_label.setText("🔄 Scanning all points...")
         self.scan_button.setEnabled(False)
-        self.progress_bar = QProgressBar()
+        if not hasattr(self, 'progress_bar'):
+            self.progress_bar = QProgressBar()
+            layout = self.state_display.parent().layout()
+            layout.insertWidget(1, self.progress_bar)
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)  # Indeterminate progress
-        layout = self.state_display.parent().layout()
-        layout.insertWidget(1, self.progress_bar)
 
         try:
             reader = BulkPointReader(self.client_args)
@@ -625,7 +627,7 @@ class AIAnalysisWidget(QWidget):
                 f"✓ Scan complete: {success_count}/{len(state.points)} "
                 "points read"
             )
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             msg = f"Error scanning points: {str(exc)}"
             self.status_label.setText(f"✗ {msg}")
             self.state_display.setText(msg)
@@ -663,7 +665,7 @@ class AIAnalysisWidget(QWidget):
                 f"{len(recommendations)} recommendations"
             )
             self.status_label.setText(msg)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             msg = f"✗ Analysis error: {str(exc)}"
             self.status_label.setText(msg)
             QMessageBox.critical(self, "Analysis Error", msg)
@@ -729,7 +731,7 @@ class AIAnalysisWidget(QWidget):
                             applied += 1
                         else:
                             failed += 1
-                except Exception as exc:
+                except Exception as exc:  # pylint: disable=broad-exception-caught
                     failed += 1
                     print(f"Error applying {point}: {exc}")
 
@@ -739,7 +741,7 @@ class AIAnalysisWidget(QWidget):
                 msg += f"\n⚠ {failed} failed"
             self.status_label.setText(msg)
             QMessageBox.information(self, "Complete", msg)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             msg = f"✗ Error applying recommendations: {str(exc)}"
             self.status_label.setText(msg)
             QMessageBox.critical(self, "Error", msg)
@@ -1040,7 +1042,7 @@ class HVACRobotGUI(QMainWindow):
             "timeout_ms": self.settings["timeout_ms"],
         }
 
-    def closeEvent(self, event) -> None:  # type: ignore[name-defined]
+    def closeEvent(self, event) -> None:  # type: ignore[name-defined] # pylint: disable=invalid-name
         """Save settings on close."""
         self.settings = self.settings_widget.get_settings()
         event.accept()

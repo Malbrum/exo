@@ -61,10 +61,16 @@ class HVACAIAnalyzer:
                 self.client = OpenAI(api_key=self.api_key)
         elif self.ai_backend == "anthropic":
             if not ANTHROPIC_AVAILABLE:
-                logger.warning("Anthropic package not installed. Install with: pip install anthropic")
+                logger.warning(
+                    "Anthropic package not installed. "
+                    "Install with: pip install anthropic"
+                )
                 self.client = None
             elif not self.api_key:
-                logger.warning("Anthropic API key not configured. Using rule-based analysis.")
+                logger.warning(
+                    "Anthropic API key not configured. "
+                    "Using rule-based analysis."
+                )
                 self.client = None
             else:
                 self.client = Anthropic(api_key=self.api_key)
@@ -100,7 +106,7 @@ class HVACAIAnalyzer:
             lines.append(f"Average Humidity: {state.humidity_avg:.1f}%")
 
         lines.append("\nPoint Values:")
-        for point_name, point in state.points.items():
+        for point in state.points.values():
             if point.success:
                 lines.append(
                     f"- {point.name}: {point.value} {point.unit or ''}"
@@ -143,7 +149,7 @@ class HVACAIAnalyzer:
                     max_tokens=1000,
                 )
                 return response.choices[0].message.content
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 return f"AI Analysis Error: {str(exc)}"
 
         elif self.ai_backend == "anthropic" and self.client:
@@ -164,7 +170,7 @@ class HVACAIAnalyzer:
                     ),
                 )
                 return response.content[0].text
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 return f"AI Analysis Error: {str(exc)}"
 
         return "No AI backend configured"
@@ -238,7 +244,7 @@ class HVACAIAnalyzer:
         return recommendations
 
     def _parse_recommendations(
-        self, analysis: str, state: HVACSystemState
+        self, analysis: str, state: HVACSystemState  # pylint: disable=unused-argument
     ) -> list[AIRecommendation]:
         """Parse AI response to extract recommendations."""
         # In a production system, this would use more sophisticated parsing
