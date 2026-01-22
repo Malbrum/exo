@@ -69,7 +69,9 @@ def parse_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    login_parser = subparsers.add_parser("login", help="Manuell innlogging og lagring av session state")
+    login_parser = subparsers.add_parser(
+        "login", help="Manuell innlogging og lagring av session state"
+    )
     login_parser.add_argument("--username", help="Brukernavn (for programmatisk innlogging)")
     login_parser.add_argument("--password", help="Passord (for programmatisk innlogging)")
     login_parser.add_argument("--domain", help="Domene/tenant (for programmatisk innlogging)")

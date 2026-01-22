@@ -69,7 +69,8 @@ class BravidaClient:
         self.page = self.context.new_page()
         self.page.set_default_timeout(self.timeout_ms)
         cookies = self.context.cookies()
-        print(f"DEBUG: Context has {len(cookies)} cookies after __enter__: {[c['name'] for c in cookies[:5]]}")
+        cookie_names = [c['name'] for c in cookies[:5]]
+        print(f"DEBUG: Context has {len(cookies)} cookies after __enter__: {cookie_names}")
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]
