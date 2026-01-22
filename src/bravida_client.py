@@ -196,18 +196,24 @@ class BravidaClient:
             raise RuntimeError("Playwright context not initialized.")
         return self.context.cookies()
     
-    def api_call(self, payload: dict) -> dict:
-        """Make an authenticated API call using the browser's session."""
+    def api_call(self, payload: dict, csrf_token: Optional[str] = None) -> dict:
+        """Make an authenticated API call using the browser's session.
+
+        csrf_token: optional token to include in headers when available.
+        """
         if not self.page:
             raise RuntimeError("Playwright page not initialized.")
         
         # Try using Playwright's native request context first (better session handling)
         try:
             print("DEBUG: Attempting API call with page.request...")
+            headers = {"Content-Type": "application/json"}
+            if csrf_token:
+                headers["X-CSRF-Token"] = csrf_token
             response = self.page.request.post(
                 "https://bracloud.bravida.no/json/POST",
                 data=json.dumps(payload),
-                headers={"Content-Type": "application/json"}
+                headers=headers
             )
             result = response.json()
             print(f"DEBUG: page.request returned: {list(result.keys())}")
@@ -216,19 +222,20 @@ class BravidaClient:
             print(f"DEBUG: page.request failed: {e}, falling back to page.evaluate()")
         
         # Fallback to page.evaluate() with fetch
-        csrf_token = None
+        extracted_csrf = csrf_token
         try:
-            csrf_elem = self.page.locator("#csrf").first
-            if csrf_elem.count() > 0:
-                csrf_token = csrf_elem.input_value()
-                print(f"DEBUG: CSRF token found: {csrf_token[:20]}...")
+            if not extracted_csrf:
+                csrf_elem = self.page.locator("#csrf").first
+                if csrf_elem.count() > 0:
+                    extracted_csrf = csrf_elem.input_value()
+                    print(f"DEBUG: CSRF token found: {extracted_csrf[:20]}...")
         except Exception as e:
             print(f"DEBUG: Could not extract CSRF token: {e}")
         
         script = f"""
         async () => {{
             const headers = {{'Content-Type': 'application/json'}};
-            const csrfToken = document.getElementById('csrf')?.value;
+            const csrfToken = {json.dumps(csrf_token)} || document.getElementById('csrf')?.value;
             if (csrfToken) {{
                 headers['X-CSRF-Token'] = csrfToken;
             }}

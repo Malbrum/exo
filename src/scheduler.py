@@ -58,6 +58,8 @@ def run_hourly_scheduler(
                     headless=headless,
                     timeout_ms=timeout_ms,
                 ) as client:
+                    if not client.page:
+                        raise RuntimeError("Playwright page failed to initialize (headless browser unavailable).")
                     # Test connectivity; if session expired, navigate to trigger re-auth
                     client.page.goto(base_url, wait_until="networkidle")
                     logger.info("Session refreshed")

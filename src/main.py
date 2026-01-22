@@ -192,6 +192,10 @@ def main() -> int:
         property_paths = DEFAULT_PROPERTY_PATHS
         if args.paths_file:
             property_paths = json.loads(Path(args.paths_file).read_text(encoding="utf-8"))
+
+        if not storage_state_path.exists() and not (args.username and args.password and args.domain):
+            logger.error("Ingen storage_state funnet og ingen credentials oppgitt. Kj›r 'login' eller oppgi --username/--password/--domain.")
+            return 1
         
         with BravidaClient(
             base_url=args.url,
@@ -220,11 +224,17 @@ def main() -> int:
             results = []
             try:
                 # Create subscription
-                create_res = browser_client.api_call({"command": "CreateSubscription"})
+                create_res = browser_client.api_call(
+                    {"command": "CreateSubscription"},
+                    csrf_token=args.csrf_token,
+                )
                 logger.info("CreateSubscription response: %s", create_res)
                 handle = create_res.get("CreateSubscriptionRes", {}).get("handle")
                 if not handle:
-                    logger.error("Failed to create subscription: %s", create_res)
+                    if "ERROR_LOGGED_OUT" in str(create_res):
+                        logger.error("Session ser ut til † v‘re utg†tt. Kj›r 'login' p† nytt eller oppgi credentials.")
+                    else:
+                        logger.error("Failed to create subscription: %s", create_res)
                     return 1
                 
                 # Add property paths
@@ -232,14 +242,14 @@ def main() -> int:
                     "command": "AddToSubscription",
                     "handle": int(handle),
                     "propertyPaths": property_paths
-                })
+                }, csrf_token=args.csrf_token)
                 logger.info("AddToSubscription returned %d items", len(add_res.get("AddToSubscriptionRes", {}).get("items", [])))
                 
                 # Read values
                 read_res = browser_client.api_call({
                     "command": "ReadSubscription",
                     "handle": int(handle)
-                })
+                }, csrf_token=args.csrf_token)
                 items = read_res.get("ReadSubscriptionRes", {}).get("items", [])
                 logger.info("ReadSubscription returned %d items", len(items))
                 
