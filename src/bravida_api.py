@@ -128,10 +128,13 @@ class BravidaAPIClient:
                 path=cookie.get("path", "/"),
             )
             if cookie.get("name") in ["CSP", "JSESSIONID", "BRAVIDA"]:
-                print(f"DEBUG: Loaded Playwright cookie {cookie.get('name')} = {cookie.get('value')[:20] if cookie.get('value') else 'None'}...")
+                cookie_value = cookie.get('value')
+                display_value = cookie_value[:20] if cookie_value else 'None'
+                print(f"DEBUG: Loaded Playwright cookie {cookie.get('name')} = {display_value}...")
             if not self.csrf_token and cookie.get("name") == "CSP":
                 self.csrf_token = cookie.get("value")
-        print(f"DEBUG: Loaded {len(cookies)} cookies from Playwright. CSRF token: {self.csrf_token[:20] if self.csrf_token else 'None'}...")
+        csrf_display = self.csrf_token[:20] if self.csrf_token else 'None'
+        print(f"DEBUG: Loaded {len(cookies)} cookies from Playwright. CSRF token: {csrf_display}...")
 
     def _load_cookies(self) -> None:
         data = json.loads(self.storage_state_path.read_text(encoding="utf-8"))
@@ -145,11 +148,14 @@ class BravidaAPIClient:
             )
             cookie_count += 1
             if cookie.get("name") in ["CSP", "JSESSIONID", "BRAVIDA"]:
-                print(f"DEBUG: Loaded cookie {cookie.get('name')} = {cookie.get('value')[:20] if cookie.get('value') else 'None'}...")
+                cookie_value = cookie.get('value')
+                display_value = cookie_value[:20] if cookie_value else 'None'
+                print(f"DEBUG: Loaded cookie {cookie.get('name')} = {display_value}...")
             if not self.csrf_token and cookie.get("name") == "CSP":
                 # Heuristic: fall back to CSP cookie as CSRF token if not provided.
                 self.csrf_token = cookie.get("value")
-        print(f"DEBUG: Loaded {cookie_count} cookies total. CSRF token: {self.csrf_token[:20] if self.csrf_token else 'None'}...")
+        csrf_display = self.csrf_token[:20] if self.csrf_token else 'None'
+        print(f"DEBUG: Loaded {cookie_count} cookies total. CSRF token: {csrf_display}...")
 
     def _headers(self) -> Dict[str, str]:
         headers = {
@@ -173,6 +179,7 @@ class BravidaAPIClient:
         return response.json()
 
     def create_subscription(self) -> int:
+        """Create a new subscription and return its handle."""
         data = self._post({"command": "CreateSubscription"})
         print(f"DEBUG CreateSubscription response: {data}")  # DEBUG
         res = data.get("CreateSubscriptionRes") or data
@@ -182,6 +189,7 @@ class BravidaAPIClient:
         return int(handle)
 
     def add_to_subscription(self, handle: int, property_paths: List[str]) -> Dict[int, str]:
+        """Add property paths to subscription and return index-to-path mapping."""
         data = self._post(
             {
                 "command": "AddToSubscription",
@@ -201,11 +209,13 @@ class BravidaAPIClient:
         return mapping
 
     def read_subscription(self, handle: int) -> List[Dict[str, Any]]:
+        """Read current values from subscription handle."""
         data = self._post({"command": "ReadSubscription", "handle": handle})
         res = data.get("ReadSubscriptionRes") or data
         return res.get("items", [])
 
     def read_values(self, property_paths: List[str]) -> List[Dict[str, Any]]:
+        """Read values for given property paths (creates temporary subscription)."""
         handle = self.create_subscription()
         index_map = self.add_to_subscription(handle, property_paths)
         items = self.read_subscription(handle)
