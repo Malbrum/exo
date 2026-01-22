@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .bravida_api import BravidaAPIClient, DEFAULT_PROPERTY_PATHS
+from .bravida_api import BravidaAPIClient, DEFAULT_PROPERTY_PATHS, hex_to_float
 from .bravida_client import BravidaClient
 from .hvac_controller import run_controller
 from .logging_utils import DEFAULT_LOG_DIR, DEFAULT_LOG_FILE, log_action, setup_logger
@@ -253,11 +253,14 @@ def main() -> int:
                     # Decode hex value if present
                     decoded_value = None
                     if isinstance(value, str) and value.startswith("0x"):
-                        decoded_value = BravidaAPIClient.hex_to_float(value)
+                        decoded_value = hex_to_float(value)
                     
                     # Find property path from index
-                    path = property_paths[index - 253] if (253 <= index < 253 + len(property_paths)) else f"Index {index}"
-                    
+                    idx_offset = index - 253
+                    if 253 <= index < 253 + len(property_paths):
+                        path = property_paths[idx_offset]
+                    else:
+                        path = f"Index {index}"
                     payload = {
                         "index": index,
                         "path": path,
@@ -278,8 +281,7 @@ def main() -> int:
                 
             except Exception as e:
                 logger.error("API call failed: %s", e)
-                import traceback
-                traceback.print_exc()
+                logger.exception("Full traceback:")
                 return 1
 
     if args.command == "gui":

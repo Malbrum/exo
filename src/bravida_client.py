@@ -135,10 +135,12 @@ class BravidaClient:
             
             print(f"DEBUG: /vp/Login API call received (status {response_info.value.status})")
         except PlaywrightTimeoutError as e:
-            print(f"DEBUG: Timeout waiting for /vp/Login. Checking page state...")
+            print("DEBUG: Timeout waiting for /vp/Login. Checking page state...")
             print(f"DEBUG: Current URL: {self.page.url}")
             print(f"DEBUG: Page title: {self.page.title()}")
-            raise RuntimeError(f"Login did not trigger API call: {e}")
+            raise RuntimeError(
+                f"Login did not trigger API call: {e}"
+            ) from e
         
         # Wait for the redirect to happen after login succeeds
         # The U() function calls location.assign() which may redirect differently

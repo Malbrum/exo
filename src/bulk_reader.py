@@ -192,7 +192,7 @@ class BulkPointReader:
             lines.append(f"Avg Humidity: {state.humidity_avg:.1f}%")
 
         lines.append("\nIndividual Points:")
-        for point_name, point in state.points.items():
+        for point in state.points.values():
             if point.success:
                 lines.append(
                     f"  • {point.name}: {point.value} {point.unit}"
