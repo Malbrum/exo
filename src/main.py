@@ -187,6 +187,20 @@ def main() -> int:
     storage_state_path = Path(args.storage_state)
     artifacts_dir = Path("artifacts")
 
+    if args.command == "scheduler":
+        if not storage_state_path.exists():
+            logger.error("Mangler storage state. Kjør 'login' først.")
+            return 1
+        from .scheduler import run_hourly_scheduler  # pylint: disable=import-outside-toplevel
+        return run_hourly_scheduler(
+            storage_state_path=storage_state_path,
+            artifacts_dir=artifacts_dir,
+            base_url=args.url,
+            headless=args.headless,
+            timeout_ms=args.timeout_ms,
+            output_file=Path(args.output_file),
+        )
+
     if args.command == "api-read":
         # Use browser context to make authenticated API calls
         property_paths = DEFAULT_PROPERTY_PATHS
@@ -450,17 +464,6 @@ def main() -> int:
                 cycle_seconds_override=args.cycle_seconds,
                 cooldown_seconds_override=args.cooldown_seconds,
             )
-
-    if args.command == "scheduler":
-        from .scheduler import run_hourly_scheduler  # pylint: disable=import-outside-toplevel
-        return run_hourly_scheduler(
-            storage_state_path=storage_state_path,
-            artifacts_dir=artifacts_dir,
-            base_url=args.url,
-            headless=args.headless,
-            timeout_ms=args.timeout_ms,
-            output_file=Path(args.output_file),
-        )
 
     return 0
 
